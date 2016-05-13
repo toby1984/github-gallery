@@ -1,5 +1,7 @@
+<!DOCTYPE html>
 <html>
-<head>
+  <head>
+  <meta charset="UTF-8">
   <script language="JavaScript" type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/2.2.3/jquery.min.js"></script>
   <style>
     .title {
@@ -13,14 +15,20 @@
       font-size: 2em;
       border: 3px solid #aaaaaa;
     }
+    .cellcontent {
+      vertical-align:top;
+      width:330px;
+      padding:5px;
+    }
     img {
-      vertical-align:bottom;
+      display:block;
+      margin-left: auto;
+      margin-right: auto;
     }
     td {
-      width:330;
-      height:280;
+      width:340px;
+      height:290px;
       border:3px solid #aaaaaa;
-      vertical-align:top;
     }
     .caption {
       border:1px solid black;
@@ -38,12 +46,12 @@
     body {
       background-color: #000000;
       color: #ffffff;
-      font-color: #ffffff;
     }
   </style>
 </head>
 <body>
 <div id="progress">
+Please wait...
 </div>
 <table>
   <tbody id="table">
@@ -51,126 +59,139 @@
 </table>
 <script>
 
-var inRow = false;
-var rowIndex = 0;
-var colInRow = 0;
-var maxColsInRow = 5;
-var currentRow = null;
-var repos = [];
-var reposChecked = 0;
-var repoCount = 0;
-
-function RepoData(data) {
-    var wrapper = {
+var githubGallery = 
+{
+    userName : "toby1984",
+    inRow : false,
+    rowIndex : 0,
+    colInRow : 0,
+    maxColsInRow : 5,
+    currentRow : null,
+    repos : [],
+    reposChecked:0,
+    RepoData : function(data) {
+      var wrapper = {
          name : data.name, 
          description: data.description,
          hasImage : false,
-         imageUrl : 'https://github.com/toby1984/'+data.name+'/blob/master/screenshot.png?raw=true'
-    };
-    return wrapper;
-}
+         imageUrl : 'https://github.com/'+githubGallery.userName+'/'+data.name+'/blob/master/screenshot.png?raw=true'
+      };
+      return wrapper;
+    },
+    checkImage : function(imageSrc, good,bad) {
+      var deferred = $.Deferred();
+      var img = new Image();
+      img.onload = function() {
+        good();
+        deferred.resolve();
+       };
+      img.onerror = function() { 
+        bad();
+        deferred.resolve();
+      };
+      img.src = imageSrc;
+      return deferred.promise();
+    },
+    addItem : function(elementFunction) 
+    {
+      var table = $('#table');
+      if ( ! githubGallery.inRow ) {
+        table.append('<tr id="row'+githubGallery.rowIndex+'">');
+        githubGallery.inRow = true;
+      }
+      githubGallery.currentRow = $('#row'+githubGallery.rowIndex);
 
-function checkImage(imageSrc, good,bad) {
-    var deferred = $.Deferred();
-    var img = new Image();
-    img.onload = function() {
-      good();
-      deferred.resolve();
-    };
-    img.onerror = function() { 
-      bad();
-      deferred.resolve();
-    };
-    img.src = imageSrc;
-    return deferred.promise();
-}
+      githubGallery.colInRow++;
 
-function addItem(elementFunction) 
-{
-  var table = $('#table');
-  if ( ! inRow ) {
-     table.append('<tr id="row'+rowIndex+'">');
-     inRow = true;
-  }
-  currentRow = $('#row'+rowIndex);
-
-  colInRow++;
-
-  elementFunction(currentRow);
+      elementFunction(githubGallery.currentRow);
   
-  if ( colInRow == maxColsInRow ) {
-     colInRow=0;
-     table.append('</tr>');
-     rowIndex++;
-     inRow = false;
-  }
-}
-
-function bumpProgress() 
-{
-       reposChecked++;
-       $('#progress').html('Checking '+reposChecked+' of '+repos.length+' repositories for screenshots...'); 
-}
-
-function gotoRepo(repoName) {
-   window.open( 'https://www.github.com//toby1984/'+repoName , '_blank' );
-}
-
-function a()
-{
-	$.getJSON('https://api.github.com/users/toby1984/repos',function(jsonData) 
-	{ 
-          $.each( jsonData , function(index,value) {
-            repos.push( RepoData(value) );
-          });
+      if ( githubGallery.colInRow == githubGallery.maxColsInRow ) {
+       githubGallery.colInRow=0;
+       table.append('</tr>');
+       githubGallery.rowIndex++;
+       githubGallery.inRow = false;
+      }
+    },
+    bumpProgress:function() 
+    {
+       githubGallery.reposChecked++;
+       githubGallery.printProgress('Checking '+githubGallery.reposChecked+' of '+githubGallery.repos.length+' repositories for screenshots...'); 
+    },
+    printProgress:function(msg) {
+       $('#progress').html(msg); 
+    },
+    gotoRepo:function(repoName) {
+      window.open( 'https://www.github.com/'+githubGallery.userName+'/'+repoName , '_blank' );
+    },
+    fetchRepos:function(pageNo,rest) {
+     githubGallery.printProgress('Retrieving repositories (page '+pageNo+')');
+     $.getJSON('https://api.github.com/users/'+githubGallery.userName+'/repos?page='+pageNo,function(jsonData) 
+     { 
+       var itemsOnPage = 0;
+       $.each( jsonData , function(index,value) {
+         githubGallery.repos.push( githubGallery.RepoData(value) );
+         itemsOnPage++;
+       });
+       if ( itemsOnPage >= 30 ) {
+         githubGallery.fetchRepos(pageNo+1,rest);
+       } else {
+         rest();
+       }
+     });
+    },
+    main : function()
+    {
+        var rest = function() {
           var promises = [];
-          $.each( repos , function(index,repo) 
+          $.each( githubGallery.repos , function(index,repo) 
           {
-            var promise = checkImage( repo.imageUrl , function() 
+            var promise = githubGallery.checkImage( repo.imageUrl , function() 
               {
                 repo.hasImage=true;
-                bumpProgress(); 
+                githubGallery.bumpProgress(); 
               }, 
               function() {
                 repo.hasImage=false;
-                bumpProgress(); 
+                githubGallery.bumpProgress(); 
               }
             ); 
             promises.push( promise );
           }); // $.each
-
+  
           // continue when all images have been checked 
           $.when.apply(null, promises).done(function() 
           {
             $('#progress').hide();
-
-            $.each( repos , function(index,repo) 
+  
+            $.each( githubGallery.repos , function(index,repo) 
             {
               if ( repo.hasImage ) {
-                addItem( function(element) {
+                githubGallery.addItem( function(element) {
                   element.append('<td title="'+repo.description+'"><div class="cellcontent" onclick="gotoRepo(\''+repo.name+'\')"><div class="title">'+repo.name+'</div><img class="screenshot" src="'+repo.imageUrl+'" width="320" height="240"></img><div class="caption">'+repo.description+'</div></div></td>');
                 });
               } 
             });
-
-            $.each( repos , function(index,repo) 
+  
+            $.each( githubGallery.repos , function(index,repo) 
             {
               if ( ! repo.hasImage ) {
-                addItem( function(element) {
+                githubGallery.addItem( function(element) {
                   element.append('<td title="'+repo.description+'"><div class="cellcontent" onclick="gotoRepo(\''+repo.name+'\')"><div class="title">'+repo.name+'</div><div class="screenshot noimage">NO IMAGE</div><div class="caption">'+repo.description+'</div></div></td>');
                 });
               }
             });
-
-
+  
+  
             // properly close <table> tag
             if ( inRow ) {
               table.append('</tr>');
             }
           });
-        });
-}
+        };
+        githubGallery.fetchRepos(1,rest);
+    }
+};
 
-a();
+githubGallery.main();
 </script>
 </body>
