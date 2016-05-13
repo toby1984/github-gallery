@@ -1,0 +1,176 @@
+<html>
+<head>
+  <script language="JavaScript" type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/2.2.3/jquery.min.js"></script>
+  <style>
+    .title {
+      font-weight:bold;
+      font-size:2em;
+      text-align:center;
+    }
+    .noimage {
+      text-align:center;
+      vertical-align:middle;
+      font-size: 2em;
+      border: 3px solid #aaaaaa;
+    }
+    img {
+      vertical-align:bottom;
+    }
+    td {
+      width:330;
+      height:280;
+      border:3px solid #aaaaaa;
+      vertical-align:top;
+    }
+    .caption {
+      border:1px solid black;
+      vertical-align:top;
+    }
+    td:hover {
+      border:3px solid white;
+    }
+    .screenshot.noimage {
+      width:320px;
+      height:240px;
+      line-height:240px;
+      background-color: #666666;
+    }
+    body {
+      background-color: #000000;
+      color: #ffffff;
+      font-color: #ffffff;
+    }
+  </style>
+</head>
+<body>
+<div id="progress">
+</div>
+<table>
+  <tbody id="table">
+  </tbody>
+</table>
+<script>
+
+var inRow = false;
+var rowIndex = 0;
+var colInRow = 0;
+var maxColsInRow = 5;
+var currentRow = null;
+var repos = [];
+var reposChecked = 0;
+var repoCount = 0;
+
+function RepoData(data) {
+    var wrapper = {
+         name : data.name, 
+         description: data.description,
+         hasImage : false,
+         imageUrl : 'https://github.com/toby1984/'+data.name+'/blob/master/screenshot.png?raw=true'
+    };
+    return wrapper;
+}
+
+function checkImage(imageSrc, good,bad) {
+    var deferred = $.Deferred();
+    var img = new Image();
+    img.onload = function() {
+      good();
+      deferred.resolve();
+    };
+    img.onerror = function() { 
+      bad();
+      deferred.resolve();
+    };
+    img.src = imageSrc;
+    return deferred.promise();
+}
+
+function addItem(elementFunction) 
+{
+  var table = $('#table');
+  if ( ! inRow ) {
+     table.append('<tr id="row'+rowIndex+'">');
+     inRow = true;
+  }
+  currentRow = $('#row'+rowIndex);
+
+  colInRow++;
+
+  elementFunction(currentRow);
+  
+  if ( colInRow == maxColsInRow ) {
+     colInRow=0;
+     table.append('</tr>');
+     rowIndex++;
+     inRow = false;
+  }
+}
+
+function bumpProgress() 
+{
+       reposChecked++;
+       $('#progress').html('Checking '+reposChecked+' of '+repos.length+' repositories for screenshots...'); 
+}
+
+function gotoRepo(repoName) {
+   window.open( 'https://www.github.com//toby1984/'+repoName , '_blank' );
+}
+
+function a()
+{
+	$.getJSON('https://api.github.com/users/toby1984/repos',function(jsonData) 
+	{ 
+          $.each( jsonData , function(index,value) {
+            repos.push( RepoData(value) );
+          });
+          var promises = [];
+          $.each( repos , function(index,repo) 
+          {
+            var promise = checkImage( repo.imageUrl , function() 
+              {
+                repo.hasImage=true;
+                bumpProgress(); 
+              }, 
+              function() {
+                repo.hasImage=false;
+                bumpProgress(); 
+              }
+            ); 
+            promises.push( promise );
+          }); // $.each
+
+          // continue when all images have been checked 
+          $.when.apply(null, promises).done(function() 
+          {
+            $('#progress').hide();
+
+            $.each( repos , function(index,repo) 
+            {
+              if ( repo.hasImage ) {
+                addItem( function(element) {
+                  element.append('<td title="'+repo.description+'"><div class="cellcontent" onclick="gotoRepo(\''+repo.name+'\')"><div class="title">'+repo.name+'</div><img class="screenshot" src="'+repo.imageUrl+'" width="320" height="240"></img><div class="caption">'+repo.description+'</div></div></td>');
+                });
+              } 
+            });
+
+            $.each( repos , function(index,repo) 
+            {
+              if ( ! repo.hasImage ) {
+                addItem( function(element) {
+                  element.append('<td title="'+repo.description+'"><div class="cellcontent" onclick="gotoRepo(\''+repo.name+'\')"><div class="title">'+repo.name+'</div><div class="screenshot noimage">NO IMAGE</div><div class="caption">'+repo.description+'</div></div></td>');
+                });
+              }
+            });
+
+
+            // properly close <table> tag
+            if ( inRow ) {
+              table.append('</tr>');
+            }
+          });
+        });
+}
+
+a();
+</script>
+</body>
