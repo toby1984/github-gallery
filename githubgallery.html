@@ -96,36 +96,36 @@ var githubGallery =
     {
       var table = $('#table');
       if ( ! githubGallery.inRow ) {
-        table.append('<tr id="row'+githubGallery.rowIndex+'">');
-        githubGallery.inRow = true;
+        table.append('<tr id="row'+this.rowIndex+'">');
+        this.inRow = true;
       }
-      githubGallery.currentRow = $('#row'+githubGallery.rowIndex);
+      this.currentRow = $('#row'+this.rowIndex);
 
-      githubGallery.colInRow++;
+      this.colInRow++;
 
-      elementFunction(githubGallery.currentRow);
+      elementFunction(this.currentRow);
   
-      if ( githubGallery.colInRow == githubGallery.maxColsInRow ) {
-       githubGallery.colInRow=0;
+      if ( this.colInRow == this.maxColsInRow ) {
+       this.colInRow=0;
        table.append('</tr>');
-       githubGallery.rowIndex++;
-       githubGallery.inRow = false;
+       this.rowIndex++;
+       this.inRow = false;
       }
     },
     bumpProgress:function() 
     {
-       githubGallery.reposChecked++;
-       githubGallery.printProgress('Checking '+githubGallery.reposChecked+' of '+githubGallery.repos.length+' repositories for screenshots...'); 
+       this.reposChecked++;
+       this.printProgress('Checking '+this.reposChecked+' of '+this.repos.length+' repositories for screenshots...'); 
     },
     printProgress:function(msg) {
        $('#progress').html(msg); 
     },
     gotoRepo:function(repoName) {
-      window.open( 'https://www.github.com/'+githubGallery.userName+'/'+repoName , '_blank' );
+      window.open( 'https://www.github.com/'+this.userName+'/'+repoName , '_blank' );
     },
     fetchRepos:function(pageNo,rest) {
-     githubGallery.printProgress('Retrieving repositories (page '+pageNo+')');
-     $.getJSON('https://api.github.com/users/'+githubGallery.userName+'/repos?page='+pageNo,function(jsonData) 
+     this.printProgress('Retrieving repositories (page '+pageNo+')');
+     $.getJSON('https://api.github.com/users/'+this.userName+'/repos?page='+pageNo,function(jsonData) 
      { 
        var itemsOnPage = 0;
        $.each( jsonData , function(index,value) {
@@ -179,16 +179,15 @@ var githubGallery =
                   element.append('<td title="'+repo.description+'"><div class="cellcontent" onclick="gotoRepo(\''+repo.name+'\')"><div class="title">'+repo.name+'</div><div class="screenshot noimage">NO IMAGE</div><div class="caption">'+repo.description+'</div></div></td>');
                 });
               }
-            });
-  
+            }); 
   
             // properly close <table> tag
-            if ( inRow ) {
-              table.append('</tr>');
+            if ( githubGallery.inRow ) {
+              $('#table').append('</tr>');
             }
           });
         };
-        githubGallery.fetchRepos(1,rest);
+        this.fetchRepos(1,rest);
     }
 };
 
