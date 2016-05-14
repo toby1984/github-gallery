@@ -2,192 +2,340 @@
 <html>
   <head>
   <meta charset="UTF-8">
+  <link href='https://fonts.googleapis.com/css?family=Droid+Serif' rel='stylesheet' type='text/css'> 
   <script language="JavaScript" type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/2.2.3/jquery.min.js"></script>
   <style>
-    .title {
-      font-weight:bold;
-      font-size:2em;
-      text-align:center;
+  
+    #pageHeader {
+      font-size:1.75em;
+      text-align:justify;      
+      color: white;
+      margin:5px;
+      height: 100px;    
     }
-    .noimage {
-      text-align:center;
-      vertical-align:middle;
-      font-size: 2em;
-      border: 3px solid #aaaaaa;
+    
+    #pageHeader:hover {
+      cursor:pointer;
+    }    
+    
+    .avatarImage 
+    {
+      display:inline-block;
+      float:left;
+      width:70px;
+      height:70px;
+      padding:5px;     
     }
-    .cellcontent {
-      vertical-align:top;
+        
+    .cell 
+    {
+      float:left;
       width:330px;
-      padding:5px;
+      height:420px;
+      margin: 5px;
+      border-radius:3px;
+      border: 2px solid white;    
+      background-color: #6170FF;
     }
-    img {
+    
+    .cell:hover {      
+      background-color: #B29F58 !important;   
+      cursor:pointer;      
+    }
+    
+    .cell:hover * {      
+      background-color: #B29F58 !important;       
+    }
+    
+    .cell_title {
+      font-weight:bold;
+      font-size:1.5em;
+      text-align:center;
+      border-top: 1px solid white;
+      padding: 5px;         
+    }
+    .cell_image {
+      border-top: 1px solid white;
       display:block;
-      margin-left: auto;
-      margin-right: auto;
-    }
-    td {
-      width:340px;
-      height:290px;
-      border:3px solid #aaaaaa;
-    }
-    .caption {
-      border:1px solid black;
-      vertical-align:top;
-    }
-    td:hover {
-      border:3px solid white;
-    }
-    .screenshot.noimage {
       width:320px;
       height:240px;
-      line-height:240px;
+      padding: 5px;
+    } 
+    .empty {
       background-color: #666666;
+      font-size: 1.5em;
+      text-align: center;
+      vertical-align:middle;
+      display:table-cell;
+    }
+    .cell_caption {
+      border-top: 1px solid white;
+      padding: 5px;
+      text-align:center;
     }
     body {
-      background-color: #000000;
+      background-color: #0F1C96;
+      color: #000000;
+      font-family: "Droid Serif", "DejaVu Serif" , serif;
+    }
+    #progress {
       color: #ffffff;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      margin-top: -50px;
+      margin-left: -50px;
+      width: 400px;
+      height: 50px;      
+    }
+    #table {
+      clear:both;
     }
   </style>
 </head>
 <body>
-<div id="progress">
-Please wait...
+<div id="githubGallery">  
+    <div id="pageHeader">
+    </div>
+    <div id="progress">Please wait...</div>
+    <div id="table"></div>  
 </div>
-<table>
-  <tbody id="table">
-  </tbody>
-</table>
 <script>
 
 var githubGallery = 
 {
+    // GitHub user account name
     userName : "toby1984",
-    inRow : false,
-    rowIndex : 0,
-    colInRow : 0,
-    maxColsInRow : 5,
-    currentRow : null,
+    // array of RepoData objects 
     repos : [],
+    // total number of JSON result "pages"
+    // with repository data that
+    // GitHub reported upon the first request
+    totalJsonPagesAvailable: 0,
+    // number of repositories that
+    // have already been checked for a screenshot
     reposChecked:0,
+    /* Wrapper around the JSON
+     * repositoy data retrieved 
+     * from the GitHub REST API.
+     */
     RepoData : function(data) {
       var wrapper = {
-         name : data.name, 
-         description: data.description,
-         hasImage : false,
-         imageUrl : 'https://github.com/'+githubGallery.userName+'/'+data.name+'/blob/master/screenshot.png?raw=true'
+        name : data.name, 
+        description: data.description,
+        hasImage : false,
+        imageUrl : 'https://github.com/'+githubGallery.userName+'/'+data.name+'/blob/master/screenshot.png?raw=true',
+        compareTo : function(repo) {
+          return this.name.localeCompare( repo.name );
+        }
       };
       return wrapper;
     },
+    /* Wrapper around the JSON
+     * user data retrieved 
+     * from the GitHub REST API.
+     */    
+    UserData : function(data) 
+    {
+      var wrapper = {
+        userId : data.login, 
+        fullName: data.name,
+        avatarUrl : data.avatar_url,
+      };
+      return wrapper;
+    },   
+    /* Returns a map of query parameters
+     * extracted from window.location     
+     */
+    queryParameters : function () 
+    {
+      // this function was taken from http://stackoverflow.com/questions/979975/how-to-get-the-value-from-the-url-parameter,
+      // written by http://stackoverflow.com/users/19068/quentin
+      var query_string = {};
+      var query = window.location.search.substring(1);
+      var vars = query.split("&");
+      for (var i=0;i<vars.length;i++) {
+        var pair = vars[i].split("=");
+            // If first entry with this name
+        if (typeof query_string[pair[0]] === "undefined") {
+          query_string[pair[0]] = decodeURIComponent(pair[1]);
+            // If second entry with this name
+        } else if (typeof query_string[pair[0]] === "string") {
+          var arr = [ query_string[pair[0]],decodeURIComponent(pair[1]) ];
+          query_string[pair[0]] = arr;
+            // If third or later entry with this name
+        } else {
+          query_string[pair[0]].push(decodeURIComponent(pair[1]));
+        }
+      } 
+      return query_string;
+     },    
+     /* Check whether an image exists.
+      *
+      * imageSrc - image URL to check
+      * good     - function to call if the image exists
+      * bad      - function to call if the image does not exists
+      */
     checkImage : function(imageSrc, good,bad) {
       var deferred = $.Deferred();
       var img = new Image();
       img.onload = function() {
+        githubGallery.bumpProgress();       
         good();
         deferred.resolve();
        };
       img.onerror = function() { 
+        githubGallery.bumpProgress();       
         bad();
         deferred.resolve();
       };
       img.src = imageSrc;
       return deferred.promise();
     },
-    addItem : function(elementFunction) 
-    {
-      var table = $('#table');
-      if ( ! githubGallery.inRow ) {
-        table.append('<tr id="row'+this.rowIndex+'">');
-        this.inRow = true;
-      }
-      this.currentRow = $('#row'+this.rowIndex);
-
-      this.colInRow++;
-
-      elementFunction(this.currentRow);
-  
-      if ( this.colInRow == this.maxColsInRow ) {
-       this.colInRow=0;
-       table.append('</tr>');
-       this.rowIndex++;
-       this.inRow = false;
-      }
-    },
+    /* Tell the user how many repos we've already scanned for screenshots */ 
     bumpProgress:function() 
     {
-       this.reposChecked++;
-       this.printProgress('Checking '+this.reposChecked+' of '+this.repos.length+' repositories for screenshots...'); 
+      this.reposChecked++;
+      this.printProgress('Checking '+this.reposChecked+' of '+this.repos.length+' repositories for screenshots...'); 
     },
+    /* Print a progress message
+     *
+     * msg - message to display
+     */
     printProgress:function(msg) {
-       $('#progress').html(msg); 
+      $('#progress').html( this.escapeHTML(msg) ); 
     },
+    /* Redirect user to GitHub page of a project */
     gotoRepo:function(repoName) {
       window.open( 'https://www.github.com/'+this.userName+'/'+repoName , '_blank' );
     },
-    fetchRepos:function(pageNo,rest) {
-     this.printProgress('Retrieving repositories (page '+pageNo+')');
-     $.getJSON('https://api.github.com/users/'+this.userName+'/repos?page='+pageNo,function(jsonData) 
-     { 
-       var itemsOnPage = 0;
-       $.each( jsonData , function(index,value) {
-         githubGallery.repos.push( githubGallery.RepoData(value) );
-         itemsOnPage++;
-       });
-       if ( itemsOnPage >= 30 ) {
-         githubGallery.fetchRepos(pageNo+1,rest);
-       } else {
-         rest();
-       }
-     });
+    getUser : function(consumer) 
+    {
+      var url = 'https://api.github.com/users/'+this.userName;
+       
+      $.getJSON( url ,function(jsonData) 
+      { 
+        consumer( githubGallery.UserData( jsonData) );
+      });
     },
+    /* Retries repository data using the GitHub REST API.
+     *
+     * pageNo - current page to load, first page is 1.
+     * rest - function to be invoked after all repositories have been fetched
+     */
+    fetchRepos:function(pageNo,rest) 
+    {
+      this.printProgress('Retrieving repositories (page '+pageNo+')');
+      var sPage = pageNo == 1 ? '' : '?page='+pageNo;
+      var url = 'https://api.github.com/users/'+this.userName+'/repos'+sPage;
+       
+      $.getJSON( url ,function(jsonData,status,xhr) 
+      { 
+        $.each( jsonData , function(index,value) {
+          githubGallery.repos.push( githubGallery.RepoData(value) );
+        });
+        if ( pageNo == 1 ) { // parse "Link" HTTP header to retrieve number of last page
+          var header = xhr.getResponseHeader("Link"); 
+          if ( header ) {
+            // 'Link' header looks like this:  <https://api.github.com/user/271364/repos?page=2>; rel="next", <https://api.github.com/user/271364/repos?page=2>; rel="last"
+            var parts = header.split(',');
+            var lastPart = parts[1];
+            githubGallery.totalJsonPagesAvailable = lastPart.split('=')[1].split('>')[0];
+          } else  { // no header => no more results
+            rest();
+            return; 
+          }
+        }
+        if ( pageNo < githubGallery.totalJsonPagesAvailable ) {
+          githubGallery.fetchRepos(pageNo+1,rest);
+        } else {
+          rest();
+        }
+      });
+    },
+    /* Helper function that filters an array based on a predicate.
+     *
+     * collection - array to filter
+     * predicate - function that returns true for all elements that should be retained
+     */
+    filter: function(collection,predicate) {
+       var result = [];
+       $(collection).each( function(index,element) {
+         if ( predicate(element) ) {
+           result.push(element);
+         }
+       });
+       return result;
+    },
+    /* helper function to escape user input, taken from https://bugs.jquery.com/ticket/11773
+     */
+    escapeHTML : function(s) {
+        return String(s).replace(/&(?!\w+;)/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    },    
+    /* MAIN ENTRY POINT */
     main : function()
     {
-        var rest = function() {
-          var promises = [];
-          $.each( githubGallery.repos , function(index,repo) 
-          {
-            var promise = githubGallery.checkImage( repo.imageUrl , function() 
-              {
-                repo.hasImage=true;
-                githubGallery.bumpProgress(); 
-              }, 
-              function() {
-                repo.hasImage=false;
-                githubGallery.bumpProgress(); 
-              }
-            ); 
-            promises.push( promise );
-          }); // $.each
-  
-          // continue when all images have been checked 
-          $.when.apply(null, promises).done(function() 
-          {
-            $('#progress').hide();
-  
-            $.each( githubGallery.repos , function(index,repo) 
+      var rest = function() 
+      {
+        // check all repositories for screenshots
+        var promises = [];
+        $.each( githubGallery.repos , function(index,repo) 
+        {
+          var promise = githubGallery.checkImage( repo.imageUrl , function() 
             {
-              if ( repo.hasImage ) {
-                githubGallery.addItem( function(element) {
-                  element.append('<td title="'+repo.description+'"><div class="cellcontent" onclick="gotoRepo(\''+repo.name+'\')"><div class="title">'+repo.name+'</div><img class="screenshot" src="'+repo.imageUrl+'" width="320" height="240"></img><div class="caption">'+repo.description+'</div></div></td>');
-                });
-              } 
-            });
-  
-            $.each( githubGallery.repos , function(index,repo) 
-            {
-              if ( ! repo.hasImage ) {
-                githubGallery.addItem( function(element) {
-                  element.append('<td title="'+repo.description+'"><div class="cellcontent" onclick="gotoRepo(\''+repo.name+'\')"><div class="title">'+repo.name+'</div><div class="screenshot noimage">NO IMAGE</div><div class="caption">'+repo.description+'</div></div></td>');
-                });
-              }
-            }); 
-  
-            // properly close <table> tag
-            if ( githubGallery.inRow ) {
-              $('#table').append('</tr>');
+              repo.hasImage=true;
+            }, 
+            function() {
+              repo.hasImage=false;
             }
+          ); 
+          promises.push( promise );
+        });
+  
+        // continue when all images have been checked 
+        $.when.apply(null, promises).done(function() 
+        {
+          $('#progress').hide();
+  
+          var withImage = githubGallery.filter( githubGallery.repos , function(repo) { return repo.hasImage; });
+          var withoutImage = githubGallery.filter( githubGallery.repos , function(repo) { return ! repo.hasImage; });          
+          
+          // sort repos by name
+          withImage.sort( function(a,b) { return a.compareTo(b); }); 
+          withoutImage.sort( function(a,b) { return a.compareTo(b); });
+
+          // render repositories with screnshots first
+          var table = $('#table');          
+          $.each( withImage , function(index,repo) 
+          {
+            table.append('<div class="cell" title="'+githubGallery.escapeHTML(repo.description)+'" onclick="githubGallery.gotoRepo(\''+githubGallery.escapeHTML(repo.name)+'\')"><div class="cell_title">'+githubGallery.escapeHTML(repo.name)+'</div><img class="cell_image" src="'+githubGallery.escapeHTML(repo.imageUrl)+'"></img><div class="cell_caption">'+githubGallery.escapeHTML(repo.description)+'</div></div></div>');
           });
-        };
-        this.fetchRepos(1,rest);
+  
+          // render repositories without screenshots last
+          $.each( withoutImage , function(index,repo) 
+          {
+            table.append('<div class="cell" title="'+githubGallery.escapeHTML(repo.description)+'" onclick="githubGallery.gotoRepo(\''+githubGallery.escapeHTML(repo.name)+'\')"><div class="cell_title">'+githubGallery.escapeHTML(repo.name)+'</div><div class="cell_image empty">NO IMAGE</div><div class="cell_caption">'+githubGallery.escapeHTML(repo.description)+'</div></div></div>');
+          });           
+        });
+      };
+      
+      // check for user name in URL
+      var userName = this.queryParameters().userName;
+      if ( userName ) {
+        this.userName = userName;
+      }
+      
+      // fetch user details
+      this.getUser( function(userData) {
+        var pageHeader = $('#pageHeader');
+        pageHeader.html('<img class="avatarImage" src="'+githubGallery.escapeHTML(userData.avatarUrl)+'"></img><div><div>'+githubGallery.escapeHTML(userData.fullName)+'</div><div>'+githubGallery.escapeHTML(userData.userId)+'</div></div>');
+        pageHeader.click( function() {
+          window.open( 'https://www.github.com/'+userData.userId , '_blank' );
+        });
+      });
+
+      // fetch & process repo data
+      this.fetchRepos(1,rest);
     }
 };
 
