@@ -80,12 +80,15 @@
     }
     #progress {
       color: #ffffff;
+      font-size: 1.5em;
       position: absolute;
       top: 50%;
       left: 50%;
       margin-top: -50px;
       margin-left: -50px;
-      width: 400px;
+      width: 500px;
+      overflow:visible;
+      white-space: nowrap;
       height: 50px;      
     }
     #table {
@@ -209,13 +212,15 @@ var githubGallery =
     gotoRepo:function(repoName) {
       window.open( 'https://www.github.com/'+this.userName+'/'+repoName , '_blank' );
     },
-    getUser : function(consumer) 
+    getUser : function(good,bad) 
     {
       var url = 'https://api.github.com/users/'+this.userName;
-       
-      $.getJSON( url ,function(jsonData) 
+      $.getJSON( url ,function(jsonData,status,xhdr) 
       { 
-        consumer( githubGallery.UserData( jsonData) );
+          good( githubGallery.UserData( jsonData) );
+      }).fail( function() 
+      {
+        bad();
       });
     },
     /* Retries repository data using the GitHub REST API.
@@ -326,16 +331,19 @@ var githubGallery =
       }
       
       // fetch user details
+      this.printProgress('Retrieving user data for '+this.userName);
       this.getUser( function(userData) {
         var pageHeader = $('#pageHeader');
         pageHeader.html('<img class="avatarImage" src="'+githubGallery.escapeHTML(userData.avatarUrl)+'"></img><div><div>'+githubGallery.escapeHTML(userData.fullName)+'</div><div>'+githubGallery.escapeHTML(userData.userId)+'</div></div>');
         pageHeader.click( function() {
           window.open( 'https://www.github.com/'+userData.userId , '_blank' );
         });
+        
+        // fetch & process repo data
+        githubGallery.fetchRepos(1,rest);        
+      },function()  {
+        githubGallery.printProgress('Something went wrong...');
       });
-
-      // fetch & process repo data
-      this.fetchRepos(1,rest);
     }
 };
 
