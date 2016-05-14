@@ -220,7 +220,7 @@ var githubGallery =
           good( githubGallery.UserData( jsonData) );
       }).fail( function() 
       {
-        bad();
+        githubGallery.printProgress('Failed to retrieve user details');
       });
     },
     /* Retries repository data using the GitHub REST API.
@@ -256,6 +256,9 @@ var githubGallery =
         } else {
           rest();
         }
+      }).fail( function() 
+      {
+        githubGallery.printProgress('Failed to retrieve repositories');
       });
     },
     /* Helper function that filters an array based on a predicate.
@@ -341,8 +344,6 @@ var githubGallery =
         
         // fetch & process repo data
         githubGallery.fetchRepos(1,rest);        
-      },function()  {
-        githubGallery.printProgress('Something went wrong...');
       });
     }
 };
